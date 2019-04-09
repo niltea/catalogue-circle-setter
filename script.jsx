@@ -185,10 +185,35 @@ var getDocumentObject = function () {
   for (var index = 0; index <= masterPageItems.length - 1; index += 1) {
     var key = masterPageItems[index].label;
     if (key.indexOf(circleBlockPrefix) >= 0) {
-      // グループをオーバーライド&Objectに格納
-      targetGroups[key] = masterPageItems[index].override(currentPage);
+      // グループをオーバーライド
+      var targetGroup = masterPageItems[index].override(currentPage);
+      // Objectに格納
+      targetGroups[key] = {
+        group: targetGroup
+      };
+      // テキストフレームを格納する処理
+      var frameLength = targetGroup.textFrames.length - 1;
+      for (var frameIndex = 0; frameIndex <= frameLength; frameIndex += 1) {
+        var frameItem = targetGroup.textFrames[frameIndex];
+        var label = frameItem.label;
+        // Objectにフレームを格納
+        targetGroup[label] = frameItem;
+        // 内容書き換え
+        // frameItem.contents = frameIndex.toString();
+      }
+      // テキストフレームを格納する処理
+      var rectLength = targetGroup.rectangles.length - 1;
+      for (var rectIndex = 0; rectIndex <= rectLength; rectIndex += 1) {
+        var rectItem = targetGroup.rectangles[rectIndex];
+        var label = rectItem.label;
+        // Objectにフレームを格納
+        targetGroup[label] = rectItem;
+        // 画像配置
+        // frameItem.place(imageFilePath);
+      }
     }
   }
+  return targetGroups;
 };
 
 // データ流し込み関数
