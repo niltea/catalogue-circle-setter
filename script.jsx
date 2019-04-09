@@ -2,6 +2,8 @@
 var filepath = "/Users/niltea/Desktop/nijisanji02.json";
 // ページごとのサークル割当数
 var circlesInPage = 6;
+// circleブロックグループのprefix名
+var circleBlockPrefix = 'circleGroup';
 
 // Node.js環境かどうか調べる
 var isNode = (typeof process !== "undefined" && typeof require !== "undefined");
@@ -171,6 +173,24 @@ var splitInPages = function (parsedEventData) {
   return pages;
 };
 
+var getDocumentObject = function () {
+  var activeDocument = app.activeDocument;
+  // get page
+  var currentPage = activeDocument.pages[0];
+  var masterPageItems = currentPage.masterPageItems;
+
+  // グループを格納するObject
+  var targetGroups = {};
+  // ページからcircleブロックグループを取り出す
+  for (var index = 0; index <= masterPageItems.length - 1; index += 1) {
+    var key = masterPageItems[index].label;
+    if (key.indexOf(circleBlockPrefix) >= 0) {
+      // グループをオーバーライド&Objectに格納
+      targetGroups[key] = masterPageItems[index].override(currentPage);
+    }
+  }
+};
+
 // データ流し込み関数
 //   prefix: 'A',
 //   range: '01-06',
@@ -179,7 +199,7 @@ var splitInPages = function (parsedEventData) {
 var applyData = function (pageData) {
   // InDesignの変数
   // 現在開いているドキュメントを指定
-  var docObj = app.activeDocument
+  var docObj = app.activeDocument;
   // 全ページ数を取得
   var docPagesCount = docObj.pages.length;
 
@@ -230,5 +250,6 @@ var mainNode = function () {
 if (isNode) {
   mainNode();
 } else {
-  main();
+  // main();
+  getDocumentObject();
 }
