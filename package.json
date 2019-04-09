@@ -1,0 +1,10 @@
+{
+  "name": "indesign",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "niltea <futurabodoni@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "fs": "^0.0.1-security"
+  }
+}
