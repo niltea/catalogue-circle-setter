@@ -94,9 +94,9 @@ var pickData = function (circle) {
 
 // ページごとにサークルデータを割り当てていく
 var splitInPages = function (parsedEventData) {
-  var circlesCount = parsedEventData.circlesCount;
+  // var circlesCount = parsedEventData.circlesCount;
   var circlesInPrefix = parsedEventData.circlesInPrefix;
-  var exhibitionName = parsedEventData.exhibitionName;
+  // var exhibitionName = parsedEventData.exhibitionName;
   var prefixArr = parsedEventData.prefixArr;
 
   // ページ割り当て用変数
@@ -153,7 +153,6 @@ var splitInPages = function (parsedEventData) {
 
       // 改ページ処理
       if (circlesInPageIndex >= circlesInPage) {
-
         addPage(firstCircleInPage, lastCircleInPage, circleInPageCount, page);
         // 変数のリセット
         page = {};
@@ -178,20 +177,23 @@ var splitInPages = function (parsedEventData) {
 //   count: circle count,
 //   circleData: Object {1~circlesInPage}
 var applyData = function (pageData) {
-//   InDesignの変数
-// 現在開いているドキュメントを指定
-  var docObj = app.activeDocument;
+  // InDesignの変数
+  // 現在開いているドキュメントを指定
+  var docObj = app.activeDocument
+  // 全ページ数を取得
   var docPagesCount = docObj.pages.length;
-//   流し込むデータのページ数
-  var pagesCount = pageData.length;
-  var pageIndex = 1;
-//   for (; pageIndex <= pagesCount; pageIndex += 1) {
-//     docObj.pages.add();
 
-//   作業するページを取得
+  // 流し込むデータのページ数
+  var pagesToSetCount = pageData.length;
+  // 作業ページのカウンター
+  var pageIndex = 1;
+  // for (; pageIndex <= pagesToSetCount; pageIndex += 1) {
+  //   docObj.pages.add();
+
+  // 作業するページを取得
   var pageObj = docObj.pages[pageIndex];
 
-//   }
+  // }
 };
 
 // InDesign用主関数
@@ -200,10 +202,10 @@ var main = function (){
   var parsedEventData = parseEventData(jsonData);
   var pages = splitInPages(parsedEventData);
   applyData(pages);
-//   log('掲載ページ数は' + pages.length + 'ページです');
+  // log('掲載ページ数は' + pages.length + 'ページです');
 };
 
-// for Node
+/*===== for Node =====*/
 var readFileNode = function () {
   return new Promise(function (resolve, reject) {
     // Nodeのとき
@@ -214,20 +216,17 @@ var readFileNode = function () {
     });
   });
 };
-var displayPages = function (pages) {
-  log(pages)
-  log('掲載ページ数は' + pages.length + 'ページです');
-};
+// Node.js用主関数
 var mainNode = function () {
   readFileNode().then(function (jsonData) {
     var parsedEventData = parseEventData(jsonData);
     var pages = splitInPages(parsedEventData);
-    displayPages(pages);
+    log(pages);
+    log('掲載ページ数は' + pages.length + 'ページです');
   });
 };
 
 // run main script
-
 if (isNode) {
   mainNode();
 } else {
