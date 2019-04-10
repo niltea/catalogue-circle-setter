@@ -69,3 +69,4 @@ fabric.properties
 # node
 /node_modules/*
 
+config.js
