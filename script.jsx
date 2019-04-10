@@ -173,47 +173,46 @@ var splitInPages = function (parsedEventData) {
   return pages;
 };
 
-var getDocumentObject = function () {
-  var activeDocument = app.activeDocument;
-  // get page
-  var currentPage = activeDocument.pages[0];
+var getDocumentObject = function (currentPage) {
   var masterPageItems = currentPage.masterPageItems;
-
   // グループを格納するObject
-  var targetGroups = {};
+  var targetObj = {};
   // ページからcircleブロックグループを取り出す
   for (var index = 0; index <= masterPageItems.length - 1; index += 1) {
-    var key = masterPageItems[index].label;
-    if (key.indexOf(circleBlockPrefix) >= 0) {
-      // グループをオーバーライド
-      var targetGroup = masterPageItems[index].override(currentPage);
-      // Objectに格納
-      targetGroups[key] = {
-        group: targetGroup
-      };
-      // テキストフレームを格納する処理
-      var frameLength = targetGroup.textFrames.length - 1;
-      for (var frameIndex = 0; frameIndex <= frameLength; frameIndex += 1) {
-        var frameItem = targetGroup.textFrames[frameIndex];
-        var label = frameItem.label;
-        // Objectにフレームを格納
-        targetGroup[label] = frameItem;
-        // 内容書き換え
-        // frameItem.contents = frameIndex.toString();
-      }
-      // テキストフレームを格納する処理
-      var rectLength = targetGroup.rectangles.length - 1;
-      for (var rectIndex = 0; rectIndex <= rectLength; rectIndex += 1) {
-        var rectItem = targetGroup.rectangles[rectIndex];
-        var label = rectItem.label;
-        // Objectにフレームを格納
-        targetGroup[label] = rectItem;
-        // 画像配置
-        // frameItem.place(imageFilePath);
-      }
+    var currentItem = masterPageItems[index];
+    var key = currentItem.label;
+    // 対象グループではない場合(prefixが無ければ)処理を抜ける
+    if (key.indexOf(circleBlockPrefix) < 0) continue;
+
+    // 現在のグループ内のオブジェクトを格納するObjectを作成
+    targetObj[key] = {};
+    var groupContainer = targetObj[key];
+    // グループをオーバーライド
+    var targetGroup = currentItem.override(currentPage);
+    // Objectに格納
+    groupContainer.group = targetGroup;
+    // テキストフレームを格納する処理
+    var frameLength = targetGroup.textFrames.length - 1;
+    for (var frameIndex = 0; frameIndex <= frameLength; frameIndex += 1) {
+      var frameItem = targetGroup.textFrames[frameIndex];
+      var label = frameItem.label;
+      // Objectにフレームを格納
+      groupContainer[label] = frameItem;
+      // 内容書き換え
+      // frameItem.contents = frameIndex.toString();
+    }
+    // カット用フレームを格納する処理
+    var rectLength = targetGroup.rectangles.length - 1;
+    for (var rectIndex = 0; rectIndex <= rectLength; rectIndex += 1) {
+      var rectItem = targetGroup.rectangles[rectIndex];
+      var label = rectItem.label;
+      // Objectにフレームを格納
+      groupContainer[label] = rectItem;
+      // 画像配置
+      // frameItem.place(imageFilePath);
     }
   }
-  return targetGroups;
+  return targetObj;
 };
 
 // データ流し込み関数
@@ -221,22 +220,25 @@ var getDocumentObject = function () {
 //   range: '01-06',
 //   count: circle count,
 //   circleData: Object {1~circlesInPage}
-var applyData = function (pageData) {
+var createPages = function (pageData) {
   // InDesignの変数
   // 現在開いているドキュメントを指定
   var docObj = app.activeDocument;
   // 全ページ数を取得
-  var docPagesCount = docObj.pages.length;
+  var initialDocPagesCount = docObj.pages.length;
 
   // 流し込むデータのページ数
   var pagesToSetCount = pageData.length;
   // 作業ページのカウンター
   var pageIndex = 1;
   // for (; pageIndex <= pagesToSetCount; pageIndex += 1) {
-  //   docObj.pages.add();
+    // 初期ページ数を上回ったら新規ページ作成
+    if (pageIndex > initialDocPagesCount) {
+      docObj.pages.add();
+    }
 
-  // 作業するページを取得
-  var pageObj = docObj.pages[pageIndex];
+    // 作業するページを取得
+    var pageObj = getDocumentObject(docObj.pages[pageIndex]);
 
   // }
 };
@@ -246,7 +248,7 @@ var main = function (){
   var jsonData = readFile();
   var parsedEventData = parseEventData(jsonData);
   var pages = splitInPages(parsedEventData);
-  applyData(pages);
+  createPages(pages);
   // log('掲載ページ数は' + pages.length + 'ページです');
 };
 
