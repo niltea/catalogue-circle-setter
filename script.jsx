@@ -113,14 +113,12 @@ var splitInPages = function (parsedEventData) {
     });
   };
 
-  var prefixCount = prefixArr.length - 1;
-  var prefixIndex = 0;
-  for (; prefixIndex <= prefixCount; prefixIndex += 1) {
+  var prefixCount = prefixArr.length;
+  for (var prefixIndex = 0; prefixIndex < prefixCount; prefixIndex += 1) {
     var prefix = prefixArr[prefixIndex];
     var circles = circlesInPrefix[prefix];
     // ループ変数
     var circleCount = circles.length - 1;
-    var circleIndex = 0;
 
     // ページ割り当て変数
     var page = {};
@@ -128,9 +126,7 @@ var splitInPages = function (parsedEventData) {
     var circleInPageCount = 0;
     var firstCircleInPage = null;
     var lastCircleInPage = null;
-    // 余りページ存在フラグ
-    var hasModPage = true;
-    for (; circleIndex <= circleCount; circleIndex += 1) {
+    for (var circleIndex = 0; circleIndex <= circleCount; circleIndex += 1) {
       var circle = circles[circleIndex];
       circlesInPageIndex += 1;
       circleInPageCount += 1;
@@ -175,7 +171,7 @@ var getDocumentObject = function (currentPage) {
   // 小口indexを格納するObject
   targetObj.thumbIndexes = {};
   // ページからcircleブロックグループを取り出す
-  for (var index = 0; index <= masterPageItems.length - 1; index += 1) {
+  for (var index = 0; index < masterPageItems.length; index += 1) {
     var currentItem = masterPageItems[index];
     var key = currentItem.label;
     // 対象グループではない場合(prefixが無ければ)処理を抜ける
@@ -242,7 +238,7 @@ var setData = function (pageObj, pageData) {
   pageObj.pageTitle.contents = pageTitle;
   // 小口indexの不要アイテム削除
   var indexTargetKey = thumbIndexPrefix + pageData.prefix;
-  for (key in pageObj.thumbIndexes) {
+  for (var key in pageObj.thumbIndexes) {
     if (key !== indexTargetKey) pageObj.thumbIndexes[key].remove();
   }
 
