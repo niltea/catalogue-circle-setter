@@ -1,9 +1,11 @@
 // 元データとなる json ファイルを指定
 var filepath = "/Users/niltea/Desktop/nijisanji02.json";
+// サークルカット格納パス
+var cutFilePath = '/';
 // ページごとのサークル割当数
 var circlesInPage = 6;
 // circleブロックグループのprefix名
-var circleBlockPrefix = 'circleGroup';
+var circleBlockPrefix = 'circleGroup-';
 
 // Node.js環境かどうか調べる
 var isNode = (typeof process !== "undefined" && typeof require !== "undefined");
@@ -198,8 +200,6 @@ var getDocumentObject = function (currentPage) {
       var label = frameItem.label;
       // Objectにフレームを格納
       groupContainer[label] = frameItem;
-      // 内容書き換え
-      // frameItem.contents = frameIndex.toString();
     }
     // カット用フレームを格納する処理
     var rectLength = targetGroup.rectangles.length - 1;
@@ -216,13 +216,30 @@ var getDocumentObject = function (currentPage) {
 };
 
 var setData = function (pageObj, pageData) {
+  for(var circleIndex = 1; circleIndex <= circlesInPage; circleIndex += 1) {
+    var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
+    var circle = pageData.circleData[circleIndex];
+
+    // スペース番号
+    docObj.prefix.contents = circle.prefix;
+    docObj.spaceNum.contents = circle.spaceNum;
+    // サークル名
+    docObj.circleName.contents = circle.circleName;
+    // ペンネーム
+    docObj.penName.contents = circle.penName;
+    // var fileName = cutFilePath + circleID + '.png';
+
+    // 2spのときの処理
+    if (circle.spaceCount === '2') {
+      circleIndex += 1;
+      // 次indexはグループごと削除
+      var nextDocObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
+      nextDocObj.group.remove();
+    }
+  }
 };
 
 // データ流し込み関数
-//   prefix: 'A',
-//   range: '01-06',
-//   count: circle count,
-//   circleData: Object {1~circlesInPage}
 var createPages = function (pageDataArr) {
   // InDesignの変数
   // 現在開いているドキュメントを指定
@@ -241,8 +258,7 @@ var createPages = function (pageDataArr) {
     }
 
     // 作業するページを取得
-    var pageObj = null;
-      // var pageObj = getDocumentObject(docObj.pages[pageIndex]);
+    var pageObj = getDocumentObject(docObj.pages[pageIndex]);
     setData(pageObj, pageDataArr[pageIndex]);
   // }
 };
