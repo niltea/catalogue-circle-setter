@@ -190,7 +190,7 @@ var getDocumentObject = function (currentPage) {
     // 対象グループではない場合(prefixが無ければ)処理を抜ける
     if (key.indexOf(circleBlockPrefix) < 0) {
       if (key === 'pageTitle') {
-        targetObj.pageTitle = currentItem;
+        targetObj.pageTitle = currentItem.override(currentPage);
       }
       continue;
     }
@@ -282,19 +282,23 @@ var createPages = function (pageDataArr) {
   var initialDocPagesCount = docObj.pages.length - 1;
 
   // 流し込むデータのページ数
-  var pagesToSetCount = pageDataArr.length - 1;
+  // TODO: Debugging
+  // var pagesToSetCount = pageDataArr.length - 1;
+  var pagesToSetCount = 3;
   // 作業ページのカウンター
   var pageIndex = 0;
-  // for (; pageIndex <= pagesToSetCount; pageIndex += 1) {
+  // マスターページ
+  var master = app.activeDocument.masterSpreads[2];
+  for (; pageIndex <= pagesToSetCount; pageIndex += 1) {
     // 初期ページ数を上回ったら新規ページ作成
     if (pageIndex > initialDocPagesCount) {
-      docObj.pages.add();
+      docObj.pages.add(LocationOptions.AT_END, master);
     }
 
     // 作業するページを取得
     var pageObj = getDocumentObject(docObj.pages[pageIndex]);
     setData(pageObj, pageDataArr[pageIndex]);
-  // }
+  }
 };
 
 // InDesign用主関数
