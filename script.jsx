@@ -1,7 +1,7 @@
 // 元データとなる json ファイルを指定
 var filepath = "/Users/niltea/Desktop/nijisanji02.json";
 // サークルカット格納パス
-var cutFilePath = '/';
+var cutFilePath = '/Users/niltea/Desktop/nijisanji02_cut/';
 // ページタイトル(prefix)
 var pageTitlePrefix = 'サークル一覧 / ';
 // ページタイトル(suffix)
@@ -217,11 +217,26 @@ var getDocumentObject = function (currentPage) {
       var label = rectItem.label;
       // Objectにフレームを格納
       groupContainer[label] = rectItem;
-      // 画像配置
-      // frameItem.place(imageFilePath);
     }
   }
   return targetObj;
+};
+
+// PNG -> JPGの優先度でいずれか存在するファイルパスを返す
+// どちらもいなければnullを返す
+var getFilePath = function (fileName) {
+  var filePathPNG = cutFilePath + fileName + '.png';
+  var filePathJPG = cutFilePath + fileName + '.jpg';
+  // check PNG
+  var PNGfile = new File(filePathPNG);
+  if (PNGfile.exists){
+    return filePathPNG;
+  }
+  var JPGfile = new File(filePathJPG);
+  if (JPGfile.exists){
+    return filePathJPG;
+  }
+  return null;
 };
 
 var setData = function (pageObj, pageData) {
@@ -238,15 +253,23 @@ var setData = function (pageObj, pageData) {
     docObj.circleName.contents = circle.circleName;
     // ペンネーム
     docObj.penName.contents = circle.penName;
-    // var fileName = cutFilePath + circleID + '.png';
 
     // 2spのときの処理
     if (circle.spaceCount === '2') {
+      // カット幅を+70mm
+      var gb = docObj.circleCut.geometricBounds;
+      gb[3] += 70;
+      docObj.circleCut.geometricBounds = gb;
       circleIndex += 1;
       // 次indexはグループごと削除
       var nextDocObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
       nextDocObj.group.remove();
     }
+    // 画像配置
+    var fileName = circle.prefix + circle.spaceNum.replace(',', '-');
+    var filePath = getFilePath(fileName);
+    if (filePath) docObj.circleCut.place(filePath);
+    docObj.circleCut.fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
   }
 };
 
