@@ -215,22 +215,25 @@ var getDocumentObject = function (currentPage) {
   return targetObj;
 };
 
+var setData = function (pageObj, pageData) {
+};
+
 // データ流し込み関数
 //   prefix: 'A',
 //   range: '01-06',
 //   count: circle count,
 //   circleData: Object {1~circlesInPage}
-var createPages = function (pageData) {
+var createPages = function (pageDataArr) {
   // InDesignの変数
   // 現在開いているドキュメントを指定
   var docObj = app.activeDocument;
   // 全ページ数を取得
-  var initialDocPagesCount = docObj.pages.length;
+  var initialDocPagesCount = docObj.pages.length - 1;
 
   // 流し込むデータのページ数
-  var pagesToSetCount = pageData.length;
+  var pagesToSetCount = pageDataArr.length - 1;
   // 作業ページのカウンター
-  var pageIndex = 1;
+  var pageIndex = 0;
   // for (; pageIndex <= pagesToSetCount; pageIndex += 1) {
     // 初期ページ数を上回ったら新規ページ作成
     if (pageIndex > initialDocPagesCount) {
@@ -238,8 +241,9 @@ var createPages = function (pageData) {
     }
 
     // 作業するページを取得
-    var pageObj = getDocumentObject(docObj.pages[pageIndex]);
-
+    var pageObj = null;
+      // var pageObj = getDocumentObject(docObj.pages[pageIndex]);
+    setData(pageObj, pageDataArr[pageIndex]);
   // }
 };
 
@@ -277,6 +281,5 @@ var mainNode = function () {
 if (isNode) {
   mainNode();
 } else {
-  // main();
-  getDocumentObject();
+  main();
 }
