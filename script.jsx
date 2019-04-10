@@ -2,6 +2,10 @@
 var filepath = "/Users/niltea/Desktop/nijisanji02.json";
 // サークルカット格納パス
 var cutFilePath = '/';
+// ページタイトル(prefix)
+var pageTitlePrefix = 'サークル一覧 / ';
+// ページタイトル(suffix)
+var pageTitleSuffix = '';
 // ページごとのサークル割当数
 var circlesInPage = 6;
 // circleブロックグループのprefix名
@@ -184,7 +188,12 @@ var getDocumentObject = function (currentPage) {
     var currentItem = masterPageItems[index];
     var key = currentItem.label;
     // 対象グループではない場合(prefixが無ければ)処理を抜ける
-    if (key.indexOf(circleBlockPrefix) < 0) continue;
+    if (key.indexOf(circleBlockPrefix) < 0) {
+      if (key === 'pageTitle') {
+        targetObj.pageTitle = currentItem;
+      }
+      continue;
+    }
 
     // 現在のグループ内のオブジェクトを格納するObjectを作成
     targetObj[key] = {};
@@ -216,6 +225,8 @@ var getDocumentObject = function (currentPage) {
 };
 
 var setData = function (pageObj, pageData) {
+  var pageTitle = pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
+  pageObj.pageTitle.contents = pageTitle;
   for(var circleIndex = 1; circleIndex <= circlesInPage; circleIndex += 1) {
     var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
     var circle = pageData.circleData[circleIndex];
