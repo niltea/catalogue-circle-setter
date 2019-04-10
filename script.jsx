@@ -242,8 +242,19 @@ var getFilePath = function (fileName) {
 var setData = function (pageObj, pageData) {
   var pageTitle = pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
   pageObj.pageTitle.contents = pageTitle;
-  for(var circleIndex = 1; circleIndex <= pageData.count; circleIndex += 1) {
+
+  // 配置済サークル数カウンタ
+  var placedCount = 0;
+  for(var circleIndex = 1; circleIndex <= circlesInPage; circleIndex += 1) {
     var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
+    // データ数以上のサークルを配置し終えた場合、残りのフレームを削除する
+    placedCount += 1;
+    if (placedCount > pageData.count) {
+      docObj.group.remove();
+      continue;
+    }
+
+    // サークルデータのキャッシュ
     var circle = pageData.circleData[circleIndex];
 
     // スペース番号
@@ -254,7 +265,7 @@ var setData = function (pageObj, pageData) {
     // ペンネーム
     docObj.penName.contents = circle.penName;
 
-    // 2spのときの処理
+    // 2spのときの処理（フレーム幅変更・不要フレーム削除）
     if (circle.spaceCount === '2') {
       // カット幅を+70mm
       var gb = docObj.circleCut.geometricBounds;
