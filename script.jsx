@@ -242,7 +242,7 @@ var getFilePath = function (fileName) {
 var setData = function (pageObj, pageData) {
   var pageTitle = pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
   pageObj.pageTitle.contents = pageTitle;
-  for(var circleIndex = 1; circleIndex <= circlesInPage; circleIndex += 1) {
+  for(var circleIndex = 1; circleIndex <= pageData.count; circleIndex += 1) {
     var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
     var circle = pageData.circleData[circleIndex];
 
