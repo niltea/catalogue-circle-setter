@@ -172,15 +172,23 @@ var getDocumentObject = function (currentPage) {
   var masterPageItems = currentPage.masterPageItems;
   // グループを格納するObject
   var targetObj = {};
+  // 小口indexを格納するObject
+  targetObj.thumbIndexes = {};
   // ページからcircleブロックグループを取り出す
   for (var index = 0; index <= masterPageItems.length - 1; index += 1) {
     var currentItem = masterPageItems[index];
     var key = currentItem.label;
     // 対象グループではない場合(prefixが無ければ)処理を抜ける
     if (key.indexOf(circleBlockPrefix) < 0) {
+      // ページタイトルobjectを格納
       if (key === 'pageTitle') {
         targetObj.pageTitle = currentItem.override(currentPage);
       }
+      // 小口indexを格納
+      if (key.indexOf(thumbIndexPrefix) >= 0) {
+        targetObj.thumbIndexes[key] = currentItem.override(currentPage);;
+      }
+      // 残りの処理は関係ないので抜ける
       continue;
     }
 
@@ -192,16 +200,16 @@ var getDocumentObject = function (currentPage) {
     // Objectに格納
     groupContainer.group = targetGroup;
     // テキストフレームを格納する処理
-    var frameLength = targetGroup.textFrames.length - 1;
-    for (var frameIndex = 0; frameIndex <= frameLength; frameIndex += 1) {
+    var frameLength = targetGroup.textFrames.length;
+    for (var frameIndex = 0; frameIndex < frameLength; frameIndex += 1) {
       var frameItem = targetGroup.textFrames[frameIndex];
       var label = frameItem.label;
       // Objectにフレームを格納
       groupContainer[label] = frameItem;
     }
     // カット用フレームを格納する処理
-    var rectLength = targetGroup.rectangles.length - 1;
-    for (var rectIndex = 0; rectIndex <= rectLength; rectIndex += 1) {
+    var rectLength = targetGroup.rectangles.length;
+    for (var rectIndex = 0; rectIndex < rectLength; rectIndex += 1) {
       var rectItem = targetGroup.rectangles[rectIndex];
       var label = rectItem.label;
       // Objectにフレームを格納
@@ -229,11 +237,18 @@ var getFilePath = function (fileName) {
 };
 
 var setData = function (pageObj, pageData) {
+  // ページタイトルのセット
   var pageTitle = pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
   pageObj.pageTitle.contents = pageTitle;
+  // 小口indexの不要アイテム削除
+  var indexTargetKey = thumbIndexPrefix + pageData.prefix;
+  for (key in pageObj.thumbIndexes) {
+    if (key !== indexTargetKey) pageObj.thumbIndexes[key].remove();
+  }
 
   // 配置済サークル数カウンタ
   var placedCount = 0;
+  // サークル詳細の入れ込み
   for(var circleIndex = 1; circleIndex <= circlesInPage; circleIndex += 1) {
     var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
     // データ数以上のサークルを配置し終えた場合、残りのフレームを削除する
@@ -283,13 +298,13 @@ var createPages = function (pageDataArr) {
 
   // 流し込むデータのページ数
   // TODO: Debugging
-  // var pagesToSetCount = pageDataArr.length - 1;
   var pagesToSetCount = 3;
+  // var pagesToSetCount = pageDataArr.length;
   // 作業ページのカウンター
   var pageIndex = 0;
   // マスターページ
   var master = app.activeDocument.masterSpreads[2];
-  for (; pageIndex <= pagesToSetCount; pageIndex += 1) {
+  for (; pageIndex < pagesToSetCount; pageIndex += 1) {
     // 初期ページ数を上回ったら新規ページ作成
     if (pageIndex > initialDocPagesCount) {
       docObj.pages.add(LocationOptions.AT_END, master);
@@ -336,4 +351,11 @@ if (isNode) {
   mainNode();
 } else {
   main();
+  // app.doScript(
+  //   main,
+  //   ScriptLanguage.JAVASCRIPT,
+  //   null,
+  //   UndoModes.FAST_ENTIRE_SCRIPT,
+  //   'サークルデータ流し込み'
+  // );
 }

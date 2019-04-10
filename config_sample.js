@@ -11,3 +11,5 @@ var pageTitleSuffix = '';
 var circlesInPage = 6;
 // circleブロックグループのprefix名
 var circleBlockPrefix = 'circleGroup-';
+// 小口indexのprefix名
+var thumbIndexPrefix = 'index-';
