@@ -1,14 +1,14 @@
 // 元データとなるデータファイルを指定
-var listFile = '/Users/niltea/Desktop/list.csv';
+// var listFile = '/Users/niltea/Desktop/list.csv';
 // リストのファイルモード json / csv
 var listMode = 'csv';
 // サークルカット格納パス
-var cutFilePath = '/Users/niltea/Desktop/cut/';
+// var cutFilePath = '/Users/niltea/Desktop/cut/';
 // ファイル名選択 kana / id / place
 var cutFileNameMode = 'id';
 
 // ページごとのサークル割当数
-var circlesInPage = 10;
+var circlesInPage = 12;
 // circleブロックグループのprefix名
 var circleBlockPrefix = 'circleGroup-';
 
@@ -69,28 +69,28 @@ var parseCSV = function (CSVData) {
 };
 
 /* JSONファイルを読み込んで格納する */
-var readFile = function () {
+var readFile = function (listFile) {
   var fileObj = new File(listFile);
-  var openFlag = fileObj.open('r');
+  var canOpenList = fileObj.open("r");
 
-  if (openFlag === true) {
+  if (canOpenList === true) {
     var readData = fileObj.read();
     fileObj.close();
     return readData;
   } else {
     log('ファイルが開けませんでした');
-    return null;
+    return {error: true};
   }
 };
 /* Node.js版 JSONファイルを読み込んで格納する */
-var readFileNode = function () {
+var readFileNode = function (listFile) {
   return new Promise(function (resolve, reject) {
     fs.readFile(listFile, 'utf8', function (err, readData) {
       if (err) {
         resolve({error: true});
         return;
       }
-      resolve(readData);
+      resolve(JSON.parse(readData));
     });
   });
 };
@@ -275,8 +275,8 @@ var getDocumentObject = function (currentPage) {
 };
 
 // PSD -> PNG -> JPGの優先度でいずれか存在するファイルパスを返す
-// どちらもいなければnullを返す
-var getFilePath = function (fileName) {
+// どちらもいなければダミーファイルのパスを返す
+var getFilePath = function (fileName, spaceCount) {
   var filePathPSD = cutFilePath + fileName + '.psd';
   var filePathPNG = cutFilePath + fileName + '.png';
   var filePathJPG = cutFilePath + fileName + '.jpg';
@@ -294,7 +294,7 @@ var getFilePath = function (fileName) {
   if (JPGfile.exists){
     return filePathJPG;
   }
-  return null;
+  return cutFilePath + '_not_uploaded-' + spaceCount + 'sp.psd';
 };
 
 var setData = function (pageObj, pageData) {
@@ -326,35 +326,35 @@ var setData = function (pageObj, pageData) {
         fileName = circle.circleID;
         break;
     }
-    var cutPath = getFilePath(fileName);
+    var cutPath = getFilePath(fileName, circle.spaceCount);
 
     // スペース番号
     docObj['space'].contents = circle.spaceNoFull;
     // サークル名
     docObj['circleName'].contents = circle.circleName;
-    if (circle.spaceCount === '2') {
-      // カット幅を倍にする処理
-      var bounds = docObj['cut'].geometricBounds;
-      // 右辺座標から左辺座標を引いてフレーム幅を求める
-      var cutWidth = bounds[3] - bounds[1];
-      docObj['cut'].geometricBounds = [
-        bounds[0],
-        bounds[1],
-        bounds[2],
-        docObj['cut'].geometricBounds[3] + cutWidth
-      ];
-    }
+    // if (circle.spaceCount === '2') {
+    //   // カット幅を倍にする処理
+    //   var bounds = docObj['cut'].geometricBounds;
+    //   // 右辺座標から左辺座標を引いてフレーム幅を求める
+    //   var cutWidth = bounds[3] - bounds[1];
+    //   docObj['cut'].geometricBounds = [
+    //     bounds[0],
+    //     bounds[1],
+    //     bounds[2],
+    //     docObj['cut'].geometricBounds[3] + cutWidth
+    //   ];
+    // }
     // サークルカットの配置・カット枠へのフィット
     if (cutPath) {
         docObj['cut'].place(File(cutPath));
-        docObj['cut'].fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
+        // docObj['cut'].fit(EmptyFrameFittingOptions.PROPORTIONALLY);
     }
     
     if (docObj.options && circle.additionChair) {
       docObj.options.contents = '追加椅子 ' + circle.additionChair;
     }
-    if (docObj.remarks && circle.isAdult) {
-      docObj.remarks.contents = '成年向';
+    if (docObj.note && circle.isAdult) {
+      docObj.note.contents = '成年向';
     }
   }
 };
@@ -386,33 +386,58 @@ var createPages = function (pageDataArr) {
   }
 };
 
-var main = function (listData) {
+var mainProcess = function (listData, ext) {
   if (listData.error) {
     log('リスト読めなかったっぽい');
     return;
   }
-  var eventData = parseCSV(listData);
-  var parsedEventData = parseEventData(eventData);
+  var parsedEventData = null;
+  if (ext === 'csv') {
+    var parsedCSV = parseCSV(listData);
+    parsedEventData = parseEventData(parsedCSV);
+  } else {
+    parsedEventData = parseEventData(listData);
+  }
   var pages = splitInPages(parsedEventData);
   if (!pages) {
     return;
   }
   log(parsedEventData.circlesCount + 'サークル\n掲載ページ数は' + pages.length + 'ページです');
   createPages(pages);
+}
+
+var main = function (listData) {  // 元データとなる json ファイルを指定
+  function listCallback (F) {
+    var re = /\.(json|csv)$/i;
+    return (F instanceof Folder || re.test(F.fsName));
+  }
+  var listFile = File.openDialog('サークルデータを選択', listCallback, false);
+  if (listFile === null) {
+    log('リストファイルが選択されていません');
+    return;
+  }
+  // サークルカット格納パス
+  function cutCallback (F) {
+    var re = /\.(psd|jpg|png)$/i;
+    return (F instanceof Folder || re.test(F.fsName));
+  }
+  var cutFile = File.openDialog('カットフォルダを選択', cutCallback, false);
+  if (cutFile === null) {
+    log('カットフォルダが選択されていません');
+    return;
+  }
+  cutFilePath = cutFile.toString().match(/^.*\//);
+  if (isNode) {
+    readFileNode().then(function (eventData) {
+      mainProcess(eventData);
+    });
+  } else {
+    // リストの拡張子を渡す
+    var listData = readFile(listFile);
+    var ext = listFile.toString().match(/[^.]+$/).toString().toLowerCase();
+    mainProcess(listData, ext);
+  }
 };
 
 // run main script
-if (isNode) {
-  readFileNode().then(function (readData) {
-    if (listMode === 'json') {
-      main(JSON.parse(readData));
-    } else {
-      main(readData);
-    }
-  });
-} else {
-  var readData = readFile();
-  if (readData) {
-    main(readData);
-  }
-}
+main();

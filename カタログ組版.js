@@ -52,7 +52,7 @@ var readFile = function (listFile) {
   }
 };
 /* Node.js版 JSONファイルを読み込んで格納する */
-var readFileNode = function () {
+var readFileNode = function (listFile) {
   return new Promise(function (resolve, reject) {
     fs.readFile(listFile, 'utf8', function (err, readData) {
       if (err) {
@@ -372,8 +372,8 @@ var getDocumentObject = function (currentPage) {
 };
 
 // PSD -> PNG -> JPGの優先度でいずれか存在するファイルパスを返す
-// どちらもいなければnullを返す
-var getFilePath = function (fileName) {
+// どちらもいなければダミーファイルのパスを返す
+var getFilePath = function (fileName, spaceCount) {
   var filePathPSD = cutFilePath + fileName + '.psd';
   var filePathPNG = cutFilePath + fileName + '.png';
   var filePathJPG = cutFilePath + fileName + '.jpg';
@@ -391,7 +391,7 @@ var getFilePath = function (fileName) {
   if (JPGfile.exists){
     return filePathJPG;
   }
-  return cutFilePath + '_not_uploaded.psd';
+  return cutFilePath + '_not_uploaded-' + spaceCount + 'sp.psd';
 };
 
 var setData = function (pageObj, pageData) {
@@ -484,7 +484,7 @@ var setData = function (pageObj, pageData) {
         }
         break;
     }
-    var cutPath = getFilePath(fileName);
+    var cutPath = getFilePath(fileName, circle.spaceCount);
     if (cutPath) {
       docObj.circleCut.place(File(cutPath));
       docObj.circleCut.fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
