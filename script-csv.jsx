@@ -1,12 +1,13 @@
 // 元データとなる json ファイルを指定
-var filepath = '~/Desktop/holokle-1st.json';
+var listFile = '/Users/niltea/Desktop/nijisanji06.csv';
+var isCSV = true;
 // サークルカット格納パス
-var cutFilePath = '~/Desktop/circlecut/';
+var cutFilePath = '/Users/niltea/Desktop/cut/';
 
 // ページタイトル(prefix)
-var pageTitlePrefix = 'サークル一覧 / ';
+var pageTitlePrefix = 'サークル一覧(';
 // ページタイトル(suffix)
-var pageTitleSuffix = '';
+var pageTitleSuffix = ')';
 // ページごとのサークル割当数
 var circlesInPage = 16;
 // circleブロックグループのprefix名
@@ -30,64 +31,135 @@ var log = function (message) {
   }
 };
 
-// InDesign用主関数
-var main = function (){
-  var jsonData = readFile();
-  var parsedEventData = parseEventData(jsonData);
-  var pages = splitInPages(parsedEventData);
-  createPages(pages);
-  // log('掲載ページ数は' + pages.length + 'ページです');
+// 引用符を除去する
+var stripQuote = function (item) {
+  return item.replace(/^['"]|['"]$/g, '');
+}
+// CSVのparse
+var parseCSV = function (CSVData) {
+  // 改行コードを正規化
+  CSVData.replace('\r\n', '\n');
+  CSVData.replace('\r', '\n');
+  // 改行コードで分割して配列に格納する
+  CSVSplitInLine = CSVData.split('\n');
+
+  // keyをparseする
+  var keys = CSVSplitInLine[0].split(',');
+  for (var keyNo = 0; keyNo < keys.length; keyNo += 1) {
+    keys[keyNo] = stripQuote(keys[keyNo]);
+  }
+  // 値をparseして格納していく
+  var parsedArray = [];
+  for (var itemNo = 1; itemNo < CSVSplitInLine.length; itemNo += 1) {
+    // 空行なら何もしない
+    if (!CSVSplitInLine[itemNo].length) {
+      continue;
+    }
+
+    var lineObject = {};
+    // 値を分割
+    var values = CSVSplitInLine[itemNo].split(',');
+
+    for (var keyNo = 0; keyNo < keys.length; keyNo += 1) {
+      lineObject[keys[keyNo]] = stripQuote(values[keyNo]);
+    }
+    parsedArray.push(lineObject);
+  }
+  // 終わった配列を返す
+  return parsedArray;
 };
 
-/* Node.js用主関数 */
-var mainNode = function () {
-  readFileNode().then(function (jsonData) {
-    log('Node.JS環境で動作中');
-    var parsedEventData = parseEventData(jsonData);
-    var pages = splitInPages(parsedEventData);
-    log(pages);
-    log('掲載ページ数は' + pages.length + 'ページです');
-  createPages(pages);
-  });
-};
+// CSVからprefixごとにサークルデータを取り出す
+var parseEventCSVData = function (eventData) {
+  var circlesCount = eventData.length;
+  //log('読み込みサークル数は' + circlesCount + 'サークルです。');
 
+  var circlesInPrefix = {};
+  var prefixArr = [];
+  for (var circleIndex = 0; circleIndex < circlesCount; circleIndex += 1) {
+    var circle = eventData[circleIndex];
+    var prefix = circle.space_sym;
+    if (!circlesInPrefix[prefix]) {
+      circlesInPrefix[prefix] = [];
+      prefixArr.push(prefix);
+    }
+    var spaceNum = circle.space_num.split('-')[0];
+    circlesInPrefix[prefix].push({
+      circle_id      : circle.id,
+      circle_name    : circle['サークル名'],
+      circle_kana :  circle['サークル名（カナ）'],
+      penname       : circle['ペンネーム'],
+      space_sym        : circle.space_sym,
+      space_num      : spaceNum,
+      spaceNo       : circle.space_sym + '-' + spaceNum,
+      spaceNumInt   : parseInt(spaceNum, 10),
+      space_count    : circle['スペース数'],
+      coupleWith    : circle['合体先サークル'],
+      additionChair : circle['追加イス'],
+      isAdult       : circle['成人向け頒布物'] === 'あり'
+    });
+  }
+  var sortOrderEnd = prefixArr.length - 1;
+  for(var prefixIndex = 0; prefixIndex <= sortOrderEnd; prefixIndex += 1) {
+    var prefix = prefixArr[prefixIndex];
+    // 各プレフィクスごとにソートする
+    circlesInPrefix[prefix] = sortCircles(circlesInPrefix[prefix]);
+  }
+  return {
+    circlesCount: circlesCount,
+    circlesInPrefix: circlesInPrefix,
+    prefixArr: prefixArr
+  };
+};
 /* JSONファイルを読み込んで格納する */
 var readFile = function () {
-  var fileObj = new File(filepath);
-  var openFlag = fileObj.open("r");
+  var listFileObj = new File(listFile);
+  var canOpenList = listFileObj.open("r");
 
-  if (openFlag === true) {
-    var jsonData = fileObj.read();
-    //　JSON のテキストを eval() でオブジェクト（配列）に変換
-    var readData = eval("(" + jsonData + ")");
-    fileObj.close();
-    return readData;
+  if (canOpenList === true) {
+    var listData = listFileObj.read();
+    
+      if (isCSV) {
+        listFileObj.close();
+        return listData;
+      } else {
+        //　JSON のテキストを eval() でオブジェクト（配列）に変換
+        var readData = eval("(" + listData + ")");
+        listFileObj.close();
+        return readData;
+    }
+    
   } else {
     log("ファイルが開けませんでした");
+    return {error: true};
   }
 };
 /* Node.js版 JSONファイルを読み込んで格納する */
 var readFileNode = function () {
   return new Promise(function (resolve, reject) {
-    // Nodeのとき
-    fs.readFile(filepath, 'utf8', function (err, readData) {
-      if (err) reject(err);
+    fs.readFile(listFile, 'utf8', function (err, readData) {
+      if (err) {
+        resolve({error: true});
+        return;
+      }
+      if (isCSV) {
+      resolve(readData);
+        } else {
       resolve(JSON.parse(readData));
+      }
     });
   });
 };
 // JSONからprefixごとにサークルデータを取り出す
 var parseEventData = function (jsonData) {
-  var exhibitionName = jsonData.exhibition.exhibition_name;
   var prefixArr = jsonData.sort_order;
 
   var circles = jsonData.circles;
   var circlesCount = circles.length;
 
   var circlesInPrefix = {};
-  var sortOrerEnd = prefixArr.length - 1;
+  var sortOrderEnd = prefixArr.length - 1;
   var sortCircleEnd = circlesCount - 1;
-  log(circlesCount + 'サークルのデータを読み込みました。');
 
   for (var circleIndex = 0; circleIndex <= sortCircleEnd; circleIndex += 1) {
     var circle = circles[circleIndex];
@@ -98,7 +170,7 @@ var parseEventData = function (jsonData) {
     }
     circlesInPrefix[prefix].push(circle);
   }
-  for(var prefixIndex = 0; prefixIndex <= sortOrerEnd; prefixIndex += 1) {
+  for(var prefixIndex = 0; prefixIndex <= sortOrderEnd; prefixIndex += 1) {
     var prefix = prefixArr[prefixIndex];
     // 各プレフィクスごとにソートする
     circlesInPrefix[prefix] = sortCircles(circlesInPrefix[prefix]);
@@ -107,7 +179,6 @@ var parseEventData = function (jsonData) {
   return {
     circlesCount: circlesCount,
     circlesInPrefix: circlesInPrefix,
-    exhibitionName: exhibitionName,
     prefixArr: prefixArr
   };
 };
@@ -122,13 +193,15 @@ var sortCircles = function (circlesArray) {
 };
 
 // 掲載用データを取り出す
-var pickData = function (circle) {
+var pruneData = function (circle) {
   return {
     circleID  : circle.circle_id,
     prefix    : circle.space_sym,
     spaceNum  : circle.space_num,
+    spaceNumInt: circle.spaceNumInt,
     penName   : circle.penname,
     circleName: circle.circle_name,
+    circleKana: circle.circle_kana,
     spaceCount: circle.space_count
   };
 };
@@ -137,8 +210,12 @@ var pickData = function (circle) {
 var splitInPages = function (parsedEventData) {
   // var circlesCount = parsedEventData.circlesCount;
   var circlesInPrefix = parsedEventData.circlesInPrefix;
-  // var exhibitionName = parsedEventData.exhibitionName;
   var prefixArr = parsedEventData.prefixArr;
+  var prefixCount = prefixArr.length;
+  if (prefixCount === 0) {
+    log('prefixの並び順がセットされてないよ');
+    return;
+  }
 
   // ページ割り当て用変数
   var pages = [];
@@ -146,62 +223,81 @@ var splitInPages = function (parsedEventData) {
   // circlesInPage = (public) circlesInPage;
 
   // ページ挿入関数
-  var addPage = function (firstCircleInPage, lastCircleInPage, circlesInPageIndex, page) {
+  var addPage = function (firstCircleInPage, lastCircleInPage, page) {
     var firstCircleNo = firstCircleInPage.spaceNum.slice(0, 2);
     var lastCircleNo  = lastCircleInPage.spaceNum.slice(-2);
+    var count = 0;
+    for(i = 0; i < circlesInPage; i += 1) {
+      if (page[i]) {
+        count += 1;
+      }
+    }
     pages.push({
       prefix    : firstCircleInPage.prefix,
       range     : firstCircleNo + '-' + lastCircleNo,
-      count     : circlesInPageIndex,
+      count     : count,
       circleData: page,
     });
   };
 
-  var prefixCount = prefixArr.length;
+  // ページ割り当て変数
+  var page = new Array(circlesInPage);
+  // ページ内の掲載順番（位置）を入れる変数
+  var layoutIndex = 0;
+  var firstCircleInPage = null;
+  var lastCircleInPage = null;
+  var pushNewPage = function () {
+    addPage(firstCircleInPage, lastCircleInPage, page);
+    // 変数のリセット
+    page = new Array(circlesInPage);
+    layoutIndex = 0;
+    firstCircleInPage = null;
+  };
+  // prefixごとにページを作成していく
   for (var prefixIndex = 0; prefixIndex < prefixCount; prefixIndex += 1) {
+    // 現在のprefixを設定
     var prefix = prefixArr[prefixIndex];
+    // 当該prefixのサークル一覧を抽出
     var circles = circlesInPrefix[prefix];
     // ループ変数
     var circleCount = circles.length - 1;
 
-    // ページ割り当て変数
-    var page = {};
-    var circlesInPageIndex = 0;
-    var circleInPageCount = 0;
-    var firstCircleInPage = null;
-    var lastCircleInPage = null;
+    // サークルをページに割り当てていく
     for (var circleIndex = 0; circleIndex <= circleCount; circleIndex += 1) {
-      var circle = circles[circleIndex];
-      circlesInPageIndex += 1;
-      circleInPageCount += 1;
-
       // 掲載データの取りだし
-      var circleData = pickData(circle);
+      var circleData = pruneData(circles[circleIndex]);
+
+      // 2spかつ配置indexが奇数のときはもう1増やしとく
+      if (circleData.spaceCount === '2' && layoutIndex % 2 == 1) {
+        page[layoutIndex] = null;
+        layoutIndex += 1;
+        // もしあふれるなら改ページ処理
+        if (layoutIndex >= circlesInPage) {
+          pushNewPage();
+        }
+      }
+
       if (!firstCircleInPage) firstCircleInPage = circleData;
       lastCircleInPage = circleData;
       // ページにサークルデータを追加
-      page[circlesInPageIndex] = circleData;
+      page[layoutIndex] = circleData;
 
-      // 2spの時はカウントを1つ増やす
+      // 2spの時はカウントをもう1つ増やし、空きにnullを入れておく
       if (circleData.spaceCount === '2') {
-        circlesInPageIndex += 1;
-        page[circlesInPageIndex] = null;
+        layoutIndex += 1;
+        page[layoutIndex] = null;
       }
 
-      // 改ページ処理
-      if (circlesInPageIndex >= circlesInPage) {
-        addPage(firstCircleInPage, lastCircleInPage, circleInPageCount, page);
-        // 変数のリセット
-        page = {};
-        circlesInPageIndex = 0;
-        circleInPageCount = 0;
-        firstCircleInPage = null;
+      layoutIndex += 1;
+      // あふれるなら改ページ処理
+      if (layoutIndex >= circlesInPage) {
+        pushNewPage();
       }
     }
     // サークルループ終端
     // 余りページがあれば追加
-    if (circlesInPageIndex !== 0) {
-      addPage(firstCircleInPage, lastCircleInPage, circlesInPageIndex, page);
+    if (layoutIndex !== 0) {
+      pushNewPage();
     }
   }
   // return
@@ -305,11 +401,15 @@ var setData = function (pageObj, pageData) {
     }
 
     // サークルデータのキャッシュ
-    var circle = pageData.circleData[circleIndex];
+    var circle = pageData.circleData[circleIndex - 1];
 
     // スペース番号
     docObj.prefix.contents = circle.prefix;
-    docObj.spaceNum.contents = circle.spaceNum.replace(',', '-');
+    if (circle.spaceCount === '2') {
+        docObj.spaceNum.contents = ('0' + circle.spaceNumInt).slice(-2) + ',' + ('0' + (circle.spaceNumInt + 1)).slice(-2);
+    } else {
+        docObj.spaceNum.contents = ('0' + circle.spaceNumInt).slice(-2);
+    }
     // サークル名
     if (docObj.circleName) {
       docObj.circleName.contents = circle.circleName;
@@ -318,21 +418,28 @@ var setData = function (pageObj, pageData) {
     if (docObj.penName) {
       docObj.penName.contents = circle.penName;
     }
-    
+
     // 2spのときの処理（フレーム幅変更・不要フレーム削除）
     if (circle.spaceCount === '2') {
-      placedCount += 1;
       // カット幅を倍にする
-      var cutgeometricBounds = docObj.circleCut.geometricBounds;
-      cutgeometricBounds[3] += 35;
-      docObj.circleCut.geometricBounds = cutgeometricBounds;
+      var bounds = docObj.circleCut.geometricBounds;
+      var cutWidth = bounds[3] - bounds[1];
+      docObj.circleCut.geometricBounds = [
+        bounds[0],
+        bounds[1],
+        bounds[2],
+        docObj.circleCut.geometricBounds[3] + cutWidth
+      ];
+      // 一コマ送る
       circleIndex += 1;
-      // 次indexはグループごと削除
-      var nextDocObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
-      nextDocObj.group.remove();
+      // 次indexグループの削除
+      pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)].group.remove();
     }
     // 画像配置
-    var cutPath = getFilePath(circle.prefix + circle.spaceNum);
+    // var cutPath = getFilePath(circle.prefix + circle.spaceNum);
+    var cutPath = getFilePath(circle.circleID);
+
+//     var cutPath = getFilePath(circle.circleKana);
     if (cutPath) {
       docObj.circleCut.place(File(cutPath));
       docObj.circleCut.fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
@@ -342,20 +449,21 @@ var setData = function (pageObj, pageData) {
 
 // データ流し込み関数
 var createPages = function (pageDataArr) {
+  if (isNode) {
+    log('node環境なので流し込みはスキップしますよ');
+    return;
+  }
   // InDesignの変数
   // 現在開いているドキュメントを指定
   var docObj = app.activeDocument;
   // 全ページ数を取得
   var initialDocPagesCount = docObj.pages.length - 1;
-
   // 流し込むデータのページ数
   var pagesToSetCount = pageDataArr.length;
-  // 作業ページのカウンター
-  var pageIndex = 0;
-  // マスターページ
+  // マスターページを取得
   var master = app.activeDocument.masterSpreads[1];
-  for (; pageIndex < pagesToSetCount; pageIndex += 1) {
-    // 初期ページ数を上回ったら新規ページ作成
+  for (var pageIndex = 0; pageIndex < pagesToSetCount; pageIndex += 1) {
+    // 初期ページ数を上回ったらマスターから新規ページ作成
     if (pageIndex > initialDocPagesCount) {
       docObj.pages.add(LocationOptions.AT_END, master);
     }
@@ -366,16 +474,49 @@ var createPages = function (pageDataArr) {
   }
 };
 
+var mainCSV = function (CSVData) {
+  if (CSVData.error) {
+    log('リスト読めなかったっぽい');
+    return;
+  }
+  var eventData = parseCSV(CSVData);
+  var parsedEventData = parseEventCSVData(eventData);
+  var pages = splitInPages(parsedEventData);
+  if (!pages) {
+    return;
+  }
+  log(parsedEventData.circlesCount + 'サークル\n掲載ページ数は' + pages.length + 'ページです');
+  createPages(pages);
+};
+
+var main = function (jsonData) {
+  if (jsonData.error) {
+    log('リスト読めなかったっぽい');
+    return;
+  }
+  var parsedEventData = parseEventData(jsonData);
+  var pages = splitInPages(parsedEventData);
+  if (!pages) {
+    return;
+  }
+  log(parsedEventData.circlesCount + 'サークル\n掲載ページ数は' + pages.length + 'ページです');
+  createPages(pages);
+};
+
 // run main script
 if (isNode) {
-  mainNode();
+  readFileNode().then(function (jsonData) {
+      if (isCSV) {
+        mainCSV(jsonData);
+        } else {
+        main(jsonData);
+      }
+  });
 } else {
-  main();
-  // app.doScript(
-  //   main,
-  //   ScriptLanguage.JAVASCRIPT,
-  //   null,
-  //   UndoModes.FAST_ENTIRE_SCRIPT,
-  //   'サークルデータ流し込み'
-  // );
+    var jsonData = readFile();
+      if (isCSV) {
+        mainCSV(jsonData);
+        } else {
+        main(jsonData);
+      }
 }
