@@ -71,3 +71,4 @@ fabric.properties
 
 config.js
 .DS_Store
+*.csv
