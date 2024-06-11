@@ -1,36 +1,35 @@
-// 元データとなるデータファイルを指定
-// var listFile = '/Users/niltea/Desktop/list.csv';
-// リストのファイルモード json / csv
-var listMode = 'csv';
-// サークルカット格納パス
-// var cutFilePath = '/Users/niltea/Desktop/cut/';
-// ファイル名選択 kana / id / place
-var cutFileNameMode = 'id';
 // ラベル組版モード？（カタログ用の見出し等処理をスキップ）
 var isLabel = true;
-var isSetCut = true;
-
+// 2spもスペースごとに出力（1枚にまとめない）
+var isSplit2sp = true;
+// サークルカットをセットする？(false: カットまわりの処理をスキップ)
+var isSetCut = false;
 // ページごとのサークル割当数
 var circlesInPageCount = 24;
 // ヘッダーを挿入する？
 var isInsertHeader = false;
 // 2spはハイフンではなく改行で繋ぐ？
 var isBreakLine2sp = false;
+
+// 開発用サークルデータパス
+var listFileDevelop = './_21906_00_test.csv';
+
+// ページタイトル(prefix)
+var pageTitlePrefix = 'サークル一覧(';
+// ページタイトル(suffix)
+var pageTitleSuffix = ')';
 // circleブロックグループのprefix名
 var circleBlockPrefix = 'circleGroup-';
-// 2spもスペースごとに出力（1枚にまとめない）
-var isSplit2sp = true;
-// circleブロックグループのprefix名
-var circleBlockPrefix = 'circleGroup-';
+// 小口indexのprefix名
+var thumbIndexPrefix = 'index-';
+// ファイル名選択 kana / id / place
+var cutFileNameMode = 'id';
 // 準備会SPのときのカットファイル名
 var jikoSPFileName = '_blank-1sp';
 // カットが上がってない場合に入れるカットのprefix
 var notUploadedFilePrefix = '_not_uploaded-';
 
 var cutFilePath = null;
-
-// 開発用サークルデータパス
-var listFileDevelop = './_21906_00_test.csv';
 
 // Node.js環境かどうか調べる
 var isNode = (typeof process !== "undefined" && typeof require !== "undefined");
@@ -62,7 +61,8 @@ var zeroPad = function (spaceNumInt) {
     return spaceNumInt.toString();
   }
 };
-/* リストファイルを読み込んで格納する */
+
+// リストファイルを読み込んで格納する
 var readFile = function (listFile) {
   if (isNode) {
     return fs.readFileSync(listFile, 'utf8');
@@ -88,7 +88,8 @@ var stripQuote = function (item) {
     return '';
   }
   return item.replace(/^['"]|['"]$/g, ''); // "
-}
+};
+
 // CSVのparse
 var parseCSV = function (CSVData) {
   // 区切り文字のカンマを=SEP=へ、セル中の改行を=BR=へ変換
@@ -187,7 +188,7 @@ var parseCSV = function (CSVData) {
     for (var dataKeyIndex = 0; dataKeyIndex < dataHeader.length; dataKeyIndex += 1) {
       if (dataHeader[dataKeyIndex] !== 'none') {
         if (dataHeader[dataKeyIndex] === 'isAdult') {
-          circleData[dataHeader[dataKeyIndex]] = (values[dataKeyIndex] === 'あり');
+          circleData[dataHeader[dataKeyIndex]] = (stripQuote(values[dataKeyIndex]) === 'あり');
         } else {
           circleData[dataHeader[dataKeyIndex]] = stripQuote(values[dataKeyIndex]).replace(/<BR>/g, '/');
         }
@@ -206,6 +207,7 @@ var sortCircles = function (circlesArray) {
     return num_a - num_b;
   })
 };
+
 // prefix一覧を取得
 var getPrefixes = function (circles) {
   var circlesCount = circles.length;
@@ -263,7 +265,6 @@ var splitInPages = function (circles) {
     pages.push({
       prefix    : firstCircleInPage.spaceSym,
       range     : firstCircleNo + '-' + lastCircleNo,
-      // dataCount     : layoutIndexInPage,
       circleData: page,
     });
   };
@@ -302,7 +303,7 @@ var splitInPages = function (circles) {
       var circleData = circlesToPlace[circleToPlaceIndex];
       circleData.removeFlag = false;
       circleData.isJikoSP = false;
-      circleData.is2SP = false;
+      circleData.is2sp = false;
       var spaceNumInt = parseInt(circleData.spaceNum, 10);
 
       // ヘッダーを入れる設定の時
@@ -328,7 +329,8 @@ var splitInPages = function (circles) {
             note: '準備会スペース',
             removeFlag: false,
             isJikoSP : true,
-            is2SP: false,
+            is2sp: false,
+            isAdult: false,
           };
           layoutIndex += 1;
           // もしあふれるなら改ページ処理
@@ -345,7 +347,7 @@ var splitInPages = function (circles) {
 
       if (circleData.spaceCount === '2') {
         prevSpaceNum = spaceNumInt + 1;
-        page[layoutIndex].is2SP = true;
+        page[layoutIndex].is2sp = true;
         if (isSplit2sp) {
           page[layoutIndex].spaceNum = zeroPad(spaceNumInt);
         }
@@ -362,7 +364,8 @@ var splitInPages = function (circles) {
           note: '2sp',
           removeFlag: true,
           isJikoSP : false,
-          is2SP : true,
+          is2sp : true,
+          isAdult: circleData.isAdult,
         };
         // 2spの時はカウントを2つ増やす
         layoutIndex += 2;
@@ -392,12 +395,27 @@ var getDocumentObject = function (currentPage) {
   var masterPageItems = currentPage.masterPageItems;
   // グループを格納するObject
   var targetObj = {};
+  // 小口indexを格納するObject
+  targetObj.thumbIndexes = {};
   // ページからcircleブロックグループを取り出す
   for (var index = 0; index < masterPageItems.length; index += 1) {
     var currentItem = masterPageItems[index];
     var key = currentItem.label;
-    // サークルitemグループじゃなかったときは処理を抜ける
+    // そもそもkeyがセットされてなければ処理しない
+    if (!key) {
+      continue;
+    }
+    // サークル情報のコンテナではない(spaceSymが無い)場合の処理
     if (key.indexOf(circleBlockPrefix) < 0) {
+      // ページタイトルobjectであればpageTitleへ格納
+      if (key === 'pageTitle') {
+        targetObj.pageTitle = currentItem.override(currentPage);
+      }
+      // 小口indexのobjectであればthumbIndex配列へ格納
+      if (key.indexOf(thumbIndexPrefix) >= 0) {
+        targetObj.thumbIndexes[key] = currentItem.override(currentPage);;
+      }
+      // あとの処理は関係ないので抜ける
       continue;
     }
 
@@ -435,60 +453,179 @@ var getFilePath = function (fileName, spaceCount) {
   var filePathPNG = cutFilePath + fileName + '.png';
   var filePathJPG = cutFilePath + fileName + '.jpg';
   // check PNG
-  var PSDfile = new File(filePathPSD);
-  if (PSDfile.exists){
+  var PSDFile = (isNode) ? fs.existsSync(filePathPSD) : new File(filePathPSD);
+  if (PSDFile === true || PSDFile.exists){
     return filePathPSD;
   }
   // check PNG
-  var PNGfile = new File(filePathPNG);
-  if (PNGfile.exists){
+  var PNGFile = (isNode) ? fs.existsSync(filePathPNG) : new File(filePathPNG);
+  if (PNGFile === true || PNGFile.exists){
     return filePathPNG;
   }
-  var JPGfile = new File(filePathJPG);
-  if (JPGfile.exists){
+  var JPGFile = (isNode) ? fs.existsSync(filePathJPG) : new File(filePathJPG);
+  if (JPGFile === true || JPGFile.exists){
     return filePathJPG;
   }
-  return cutFilePath + '_not_uploaded-' + spaceCount + 'sp.psd';
+  if (!spaceCount) {
+    return cutFilePath + notUploadedFilePrefix + '1sp.psd';
+  }
+  return cutFilePath + notUploadedFilePrefix + spaceCount + 'sp.psd';
 };
 
 var setData = function (pageObj, pageData) {
-  // 配置済サークル数カウンタ
-  var placedCount = 0;
-  // サークル詳細の入れ込み
-  for(var circleIndex = 1; circleIndex <= circlesInPage; circleIndex += 1) {
-    var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
-    // データ数以上のサークルを配置し終えた場合、残りのフレームを削除する
-    placedCount += 1;
-    if (placedCount > pageData.count) {
-      docObj.group.remove();
-      continue;
+  if (isNode) {
+    // Nodeシミュレーション用: 仮Objectを入れ込む
+    pageObj = {
+      pageTitle: {},
+      thumbIndexes: {
+        'index-A': {remove: function () { log('removed index-A')}},
+        'index-B': {remove: function () { log('removed index-B')}}
+      }
     }
+    // サークルカットObjectの生成
+    for (var i = 1; i <= circlesInPageCount; i += 1) {
+      var theObj = {
+        group: {
+          remove: function () {
+            delete this.parent.prefix;
+            delete this.parent.spaceNum;
+            delete this.parent.circleName;
+            delete this.parent.penName;
+            delete this.parent.circleCut;
+            delete this.parent.group;
+            delete this.parent.space;
+            if (isLabel) {
+              delete this.parent.is2sp;
+              delete this.parent.isAdult;
+              delete this.parent.options;
+            }
+          }
+        },
+        prefix: {contents: ''},
+        spaceNum: {contents: ''},
+        space: {contents: ''},
+        circleName: {contents: ''},
+        penName: {contents: ''},
+        circleCut: {
+          // y1, x1, y2, x2
+          geometricBounds: [0, 0, 100, 100]
+        }
+      };
+      if (isLabel) {
+        theObj.is2sp = {contents: '2スペース'};
+        theObj.isAdult = {contents: '成年向'};
+        theObj.options = {contents: '追加椅子: xxx脚'};
+      }
+      theObj.group.parent = theObj;
+      pageObj[circleBlockPrefix + ('0' + i).slice(-2)] = theObj;
+    }
+  }
+  // Nodeシミュレーション用ダミーオブジェクト生成：ここまで
+  // カタログ組版時の作業
+  if (!isLabel) {
+    // ページタイトルのセット
+    if (pageObj.pageTitle) {
+      pageObj.pageTitle.contents =  pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
+    }
+    // 小口indexの不要アイテム削除
+    var indexTargetKey = thumbIndexPrefix + pageData.prefix;
+    for (var key in pageObj.thumbIndexes) {
+      if (key !== indexTargetKey) pageObj.thumbIndexes[key].remove();
+    }
+  }
 
+  // サークル詳細の入れ込み
+  for(var circleIndex = 1; circleIndex <= circlesInPageCount; circleIndex += 1) {
+    // サークルデータを入れるObjectをキャッシュ
+    var docObj = pageObj[circleBlockPrefix + ('0' + circleIndex).slice(-2)];
     // サークルデータのキャッシュ
     var circle = pageData.circleData[circleIndex - 1];
 
-    // 画像配置
-    var fileName = '';
-    switch(cutFileNameMode) {
-      case 'kana':
-        fileName = circle.circleNameKana;
-        break;
-      case 'place':
-        fileName = circle.spaceNoHyp;
-        break;
-      case 'id':
-        fileName = circle.circleID;
-        break;
+    // 2spめのとき or 該当するサークルデータが空の時
+    if (circle === undefined || circle === null || (circle.removeFlag && !isSplit2sp)) {
+      // indexグループの削除
+      docObj.group.remove();
+      docObj.isToRemoved = true;
+      continue;
     }
-    var cutPath = getFilePath(fileName, circle.spaceCount);
 
     // スペース番号
-    docObj['space'].contents = circle.spaceNoFull;
+    // prefix
+    if (docObj.prefix && circle.spaceSym) {
+      docObj.prefix.contents = circle.spaceSym;
+    }
+    // スペース数字
+    if (docObj.spaceNum && circle.spaceNum) {
+      var spaceNum = circle.spaceNum;
+      // スペース番号を加工する処理
+      // 2spは途中で改行する？ など
+      if (circle.spaceCount === '2' && isBreakLine2sp) {
+        docObj.spaceNum.contents = spaceNum.replace('-', '\n');
+      } else {
+        docObj.spaceNum.contents = spaceNum;
+      }
+    }
+    // prefixと数字が一緒に入るケース
+    if (docObj.space) {
+      docObj.space.contents = circle.spaceSym + '-' + circle.spaceNum;
+    }
+
     // サークル名
-    docObj['circleName'].contents = circle.circleName;
+    if (docObj.circleName && circle.circleName) {
+      docObj.circleName.contents = circle.circleName;
+    }
+
+    // ペンネーム
+    if (docObj.penName && circle.penName) {
+      docObj.penName.contents = circle.penName;
+    }
+
     // サークルカットの配置
     if (cutPath && isSetCut) {
-        docObj['circleCut'].place(File(cutPath));
+      // 2spのときの処理（フレーム幅変更・不要フレーム削除）
+      if (circle.spaceCount && circle.spaceCount === '2') {
+        // カット幅を倍にする
+        var bounds = docObj.circleCut.geometricBounds;
+        var cutWidth = bounds[3] - bounds[1];
+        docObj.circleCut.geometricBounds = [
+          bounds[0],
+          bounds[1],
+          bounds[2],
+          docObj.circleCut.geometricBounds[3] + cutWidth
+        ];
+      }
+      // 画像配置
+      var fileName = '';
+      switch(cutFileNameMode) {
+        case 'kana':
+          if (circle.circleNameKana) {
+            fileName = circle.circleNameKana;
+          }
+          break;
+        case 'place':
+          if (circle.spaceSym　&& circle.spaceNum) {
+            fileName = circle.spaceSym + '-' + circle.spaceNum;
+          }
+          break;
+        case 'id':
+          if (circle.circleID) {
+            fileName = circle.circleID;
+          }
+          break;
+      }
+      // 事故スペのときのカット名をセット
+      if (circle.isJikoSP) {
+        fileName = jikoSPFileName;
+      }
+      var cutPath = getFilePath(fileName, circle.spaceCount);
+      if (isNode) {
+        docObj.circleCut.filePath = cutPath;
+        continue;
+      }
+      if (cutPath) {
+        docObj.circleCut.place(File(cutPath));
+        docObj.circleCut.fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
+      }
     }
 
     // ラベル用処理
@@ -508,13 +645,24 @@ var setData = function (pageObj, pageData) {
         docObj.options.contents = '';
       }
     }
+    // サークルループ終端
+  }
+
+  // Nodeデバッグ用
+  if (isNode) {
+    log(pageObj)
   }
 };
 
 // データ流し込み関数
 var createPages = function (pageDataArr) {
+  // 流し込むデータのページ数
+  var pagesToSetCount = pageDataArr.length;
   if (isNode) {
-    log('node環境なので流し込みはスキップしますよ');
+    for (var pageIndexSimulate = 0; pageIndexSimulate < pagesToSetCount; pageIndexSimulate += 1) {
+      // 作業するページを取得
+      setData(null, pageDataArr[pageIndexSimulate]);
+    }
     return;
   }
   // InDesignの変数
@@ -522,10 +670,8 @@ var createPages = function (pageDataArr) {
   var docObj = app.activeDocument;
   // 全ページ数を取得
   var initialDocPagesCount = docObj.pages.length - 1;
-  // 流し込むデータのページ数
-  var pagesToSetCount = pageDataArr.length;
   // マスターページを取得
-  var master = app.activeDocument.masterSpreads[0];
+  var master = app.activeDocument.masterSpreads[1];
   for (var pageIndex = 0; pageIndex < pagesToSetCount; pageIndex += 1) {
     // 初期ページ数を上回ったらマスターから新規ページ作成
     if (pageIndex > initialDocPagesCount) {
@@ -537,26 +683,6 @@ var createPages = function (pageDataArr) {
     setData(pageObj, pageDataArr[pageIndex]);
   }
 };
-
-var mainProcess = function (listData, ext) {
-  if (listData.error) {
-    log('リスト読めなかったっぽい');
-    return;
-  }
-  var parsedEventData = null;
-  if (ext === 'csv') {
-    var parsedCSV = parseCSV(listData);
-    parsedEventData = parseEventData(parsedCSV);
-  } else {
-    parsedEventData = parseEventData(listData);
-  }
-  var pages = splitInPages(parsedEventData);
-  if (!pages) {
-    return;
-  }
-  log(parsedEventData.circlesCount + 'サークル\n掲載ページ数は' + pages.length + 'ページです');
-  createPages(pages);
-}
 
 var main = function () {
   // InDesign環境ではファイルダイアログを開いてリストファイルパスよみこみ

@@ -1,13 +1,23 @@
-// ページタイトル(prefix)
-var pageTitlePrefix = 'サークル一覧(';
-// ページタイトル(suffix)
-var pageTitleSuffix = ')';
+// ラベル組版モード？（カタログ用の見出し等処理をスキップ）
+var isLabel = false;
+// 2spもスペースごとに出力（1枚にまとめない）
+var isSplit2sp = false;
+// サークルカットをセットする？(false: カットまわりの処理をスキップ)
+var isSetCut = true;
 // ページごとのサークル割当数
-var circlesInPageCount = 16;
+var circlesInPageCount = 24;
 // ヘッダーを挿入する？
 var isInsertHeader = false;
 // 2spはハイフンではなく改行で繋ぐ？
 var isBreakLine2sp = false;
+
+// 開発用サークルデータパス
+var listFileDevelop = './_21906_00_test.csv';
+
+// ページタイトル(prefix)
+var pageTitlePrefix = 'サークル一覧(';
+// ページタイトル(suffix)
+var pageTitleSuffix = ')';
 // circleブロックグループのprefix名
 var circleBlockPrefix = 'circleGroup-';
 // 小口indexのprefix名
@@ -20,9 +30,6 @@ var jikoSPFileName = '_blank-1sp';
 var notUploadedFilePrefix = '_not_uploaded-';
 
 var cutFilePath = null;
-
-// 開発用サークルデータパス
-var listFileDevelop = '/Users/niltea/Library/CloudStorage/SynologyDrive-niltea/events/_nijisousaku/10_カタログ/cut_niji09_fix/_21906_00_test.csv';
 
 // Node.js環境かどうか調べる
 var isNode = (typeof process !== "undefined" && typeof require !== "undefined");
@@ -55,7 +62,7 @@ var zeroPad = function (spaceNumInt) {
   }
 };
 
-/* リストファイルを読み込んで格納する */
+// リストファイルを読み込んで格納する
 var readFile = function (listFile) {
   if (isNode) {
     return fs.readFileSync(listFile, 'utf8');
@@ -74,13 +81,15 @@ var readFile = function (listFile) {
     }
   }
 };
+
 // 引用符を除去する
 var stripQuote = function (item) {
   if (!item) {
     return '';
   }
   return item.replace(/^['"]|['"]$/g, ''); // "
-}
+};
+
 // CSVのparse
 var parseCSV = function (CSVData) {
   // 区切り文字のカンマを=SEP=へ、セル中の改行を=BR=へ変換
@@ -179,7 +188,7 @@ var parseCSV = function (CSVData) {
     for (var dataKeyIndex = 0; dataKeyIndex < dataHeader.length; dataKeyIndex += 1) {
       if (dataHeader[dataKeyIndex] !== 'none') {
         if (dataHeader[dataKeyIndex] === 'isAdult') {
-          circleData[dataHeader[dataKeyIndex]] = (values[dataKeyIndex] === 'あり');
+          circleData[dataHeader[dataKeyIndex]] = (stripQuote(values[dataKeyIndex]) === 'あり');
         } else {
           circleData[dataHeader[dataKeyIndex]] = stripQuote(values[dataKeyIndex]).replace(/<BR>/g, '/');
         }
@@ -256,7 +265,6 @@ var splitInPages = function (circles) {
     pages.push({
       prefix    : firstCircleInPage.spaceSym,
       range     : firstCircleNo + '-' + lastCircleNo,
-      dataCount     : layoutIndexInPage,
       circleData: page,
     });
   };
@@ -295,6 +303,7 @@ var splitInPages = function (circles) {
       var circleData = circlesToPlace[circleToPlaceIndex];
       circleData.removeFlag = false;
       circleData.isJikoSP = false;
+      circleData.is2sp = false;
       var spaceNumInt = parseInt(circleData.spaceNum, 10);
 
       // ヘッダーを入れる設定の時
@@ -320,6 +329,8 @@ var splitInPages = function (circles) {
             note: '準備会スペース',
             removeFlag: false,
             isJikoSP : true,
+            is2sp: false,
+            isAdult: false,
           };
           layoutIndex += 1;
           // もしあふれるなら改ページ処理
@@ -336,6 +347,10 @@ var splitInPages = function (circles) {
 
       if (circleData.spaceCount === '2') {
         prevSpaceNum = spaceNumInt + 1;
+        page[layoutIndex].is2sp = true;
+        if (isSplit2sp) {
+          page[layoutIndex].spaceNum = zeroPad(spaceNumInt);
+        }
         // 入るべきIndexにnullを入れておく
         page[layoutIndex + 1] = {
           circleID: circleData.circleID,
@@ -349,6 +364,8 @@ var splitInPages = function (circles) {
           note: '2sp',
           removeFlag: true,
           isJikoSP : false,
+          is2sp : true,
+          isAdult: circleData.isAdult,
         };
         // 2spの時はカウントを2つ増やす
         layoutIndex += 2;
@@ -476,10 +493,17 @@ var setData = function (pageObj, pageData) {
             delete this.parent.penName;
             delete this.parent.circleCut;
             delete this.parent.group;
+            delete this.parent.space;
+            if (isLabel) {
+              delete this.parent.is2sp;
+              delete this.parent.isAdult;
+              delete this.parent.options;
+            }
           }
         },
         prefix: {contents: ''},
         spaceNum: {contents: ''},
+        space: {contents: ''},
         circleName: {contents: ''},
         penName: {contents: ''},
         circleCut: {
@@ -487,19 +511,29 @@ var setData = function (pageObj, pageData) {
           geometricBounds: [0, 0, 100, 100]
         }
       };
+      if (isLabel) {
+        theObj.is2sp = {contents: '2スペース'};
+        theObj.isAdult = {contents: '成年向'};
+        theObj.options = {contents: '追加椅子: xxx脚'};
+      }
       theObj.group.parent = theObj;
       pageObj[circleBlockPrefix + ('0' + i).slice(-2)] = theObj;
     }
   }
-  // ページタイトルのセット
-  if (pageObj.pageTitle) {
-    pageObj.pageTitle.contents =  pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
+  // Nodeシミュレーション用ダミーオブジェクト生成：ここまで
+  // カタログ組版時の作業
+  if (!isLabel) {
+    // ページタイトルのセット
+    if (pageObj.pageTitle) {
+      pageObj.pageTitle.contents =  pageTitlePrefix + pageData.prefix + pageData.range + pageTitleSuffix;
+    }
+    // 小口indexの不要アイテム削除
+    var indexTargetKey = thumbIndexPrefix + pageData.prefix;
+    for (var key in pageObj.thumbIndexes) {
+      if (key !== indexTargetKey) pageObj.thumbIndexes[key].remove();
+    }
   }
-  // 小口indexの不要アイテム削除
-  var indexTargetKey = thumbIndexPrefix + pageData.prefix;
-  for (var key in pageObj.thumbIndexes) {
-    if (key !== indexTargetKey) pageObj.thumbIndexes[key].remove();
-  }
+
   // サークル詳細の入れ込み
   for(var circleIndex = 1; circleIndex <= circlesInPageCount; circleIndex += 1) {
     // サークルデータを入れるObjectをキャッシュ
@@ -508,16 +542,19 @@ var setData = function (pageObj, pageData) {
     var circle = pageData.circleData[circleIndex - 1];
 
     // 2spめのとき or 該当するサークルデータが空の時
-    if (circle === undefined || circle === null || circle.removeFlag) {
+    if (circle === undefined || circle === null || (circle.removeFlag && !isSplit2sp)) {
       // indexグループの削除
       docObj.group.remove();
+      docObj.isToRemoved = true;
       continue;
     }
 
     // スペース番号
+    // prefix
     if (docObj.prefix && circle.spaceSym) {
       docObj.prefix.contents = circle.spaceSym;
     }
+    // スペース数字
     if (docObj.spaceNum && circle.spaceNum) {
       var spaceNum = circle.spaceNum;
       // スペース番号を加工する処理
@@ -528,64 +565,90 @@ var setData = function (pageObj, pageData) {
         docObj.spaceNum.contents = spaceNum;
       }
     }
+    // prefixと数字が一緒に入るケース
+    if (docObj.space) {
+      docObj.space.contents = circle.spaceSym + '-' + circle.spaceNum;
+    }
+
     // サークル名
     if (docObj.circleName && circle.circleName) {
       docObj.circleName.contents = circle.circleName;
     }
+
     // ペンネーム
     if (docObj.penName && circle.penName) {
       docObj.penName.contents = circle.penName;
     }
 
-    // 2spのときの処理（フレーム幅変更・不要フレーム削除）
-    if (circle.spaceCount && circle.spaceCount === '2') {
-      // カット幅を倍にする
-      var bounds = docObj.circleCut.geometricBounds;
-      var cutWidth = bounds[3] - bounds[1];
-      docObj.circleCut.geometricBounds = [
-        bounds[0],
-        bounds[1],
-        bounds[2],
-        docObj.circleCut.geometricBounds[3] + cutWidth
-      ];
-      // 一コマ送る→これ削って良いはず…？
-      // circleIndex += 1;
+    // サークルカットの配置
+    if (cutPath && isSetCut) {
+      // 2spのときの処理（フレーム幅変更・不要フレーム削除）
+      if (circle.spaceCount && circle.spaceCount === '2') {
+        // カット幅を倍にする
+        var bounds = docObj.circleCut.geometricBounds;
+        var cutWidth = bounds[3] - bounds[1];
+        docObj.circleCut.geometricBounds = [
+          bounds[0],
+          bounds[1],
+          bounds[2],
+          docObj.circleCut.geometricBounds[3] + cutWidth
+        ];
+      }
+      // 画像配置
+      var fileName = '';
+      switch(cutFileNameMode) {
+        case 'kana':
+          if (circle.circleNameKana) {
+            fileName = circle.circleNameKana;
+          }
+          break;
+        case 'place':
+          if (circle.spaceSym　&& circle.spaceNum) {
+            fileName = circle.spaceSym + '-' + circle.spaceNum;
+          }
+          break;
+        case 'id':
+          if (circle.circleID) {
+            fileName = circle.circleID;
+          }
+          break;
+      }
+      // 事故スペのときのカット名をセット
+      if (circle.isJikoSP) {
+        fileName = jikoSPFileName;
+      }
+      var cutPath = getFilePath(fileName, circle.spaceCount);
+      if (isNode) {
+        docObj.circleCut.filePath = cutPath;
+        continue;
+      }
+      if (cutPath) {
+        docObj.circleCut.place(File(cutPath));
+        docObj.circleCut.fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
+      }
     }
-    // 画像配置
-    var fileName = '';
-    switch(cutFileNameMode) {
-      case 'kana':
-        if (circle.circleNameKana) {
-          fileName = circle.circleNameKana;
-        }
-        break;
-      case 'place':
-        if (circle.spaceSym　&& circle.spaceNum) {
-          fileName = circle.spaceSym + '-' + circle.spaceNum;
-        }
-        break;
-      case 'id':
-        if (circle.circleID) {
-          fileName = circle.circleID;
-        }
-        break;
-    }
-    // 事故スペのときのカット名をセット
-    if (circle.isJikoSP) {
-      fileName = jikoSPFileName;
-    }
-    var cutPath = getFilePath(fileName, circle.spaceCount);
-    if (isNode) {
-      docObj.circleCut.filePath = cutPath;
+
+    // ラベル用処理
+    if (!isLabel) {
       continue;
     }
-    if (cutPath) {
-      docObj.circleCut.place(File(cutPath));
-      docObj.circleCut.fit(EmptyFrameFittingOptions.CONTENT_TO_FRAME);
+    if (docObj.is2sp && !circle.is2sp) {
+      docObj.is2sp.contents = '';
     }
+    if (docObj.isAdult && !circle.isAdult) {
+      docObj.isAdult.contents = '';
+    }
+    if (docObj.options) {
+      if (circle.addChair) {
+        docObj.options.contents = '追加椅子 ' + circle.addChair;
+      } else {
+        docObj.options.contents = '';
+      }
+    }
+    // サークルループ終端
   }
 
-  // Node
+  // Nodeデバッグ用
   if (isNode) {
     log(pageObj)
   }
