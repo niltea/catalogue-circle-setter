@@ -12,7 +12,7 @@ var isInsertHeader = false;
 var isBreakLine2sp = false;
 
 // 開発用サークルデータパス
-var listFileDevelop = './_21906_00_test.csv';
+var listFileDevelop = './21906.csv';
 
 // ページタイトル(prefix)
 var pageTitlePrefix = 'サークル一覧(';
@@ -732,6 +732,8 @@ var main = function () {
 
 // run main script
 if (isNode) {
+  main();
+} else {
   main();
   // app.doScript(main, ScriptLanguage.javascript, [], UndoModes.fastEntireScript);
 }

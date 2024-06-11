@@ -733,5 +733,7 @@ var main = function () {
 // run main script
 if (isNode) {
   main();
+} else {
+  main();
   // app.doScript(main, ScriptLanguage.javascript, [], UndoModes.fastEntireScript);
 }
