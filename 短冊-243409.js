@@ -1,7 +1,6 @@
 // 開発用サークルデータ
 var listFileDevelop = '/Users/niltea/Library/Preferences/Adobe InDesign/Version 19.0-J/ja_JP/Scripts/Scripts Panel/test.csv';
 // サークルカット格納パス
-var cutFilePath = null;
 var cutFilePathDevelop = '/Users/niltea/Desktop/cut/';
 
 // リストのファイルモード json / csv
@@ -438,8 +437,8 @@ var setData = function (pageObj, pageData) {
 
     // サークルカットの配置・カット枠へのフィット
     if (cutPath) {
-      docObj['cut'].place(File(cutPath));
-      docObj['cut'].fit(EmptyFrameFittingOptions.PROPORTIONALLY);
+        docObj['cut'].place(File(cutPath));
+        docObj['cut'].fit(EmptyFrameFittingOptions.PROPORTIONALLY);
     }
   }
 };
@@ -472,12 +471,10 @@ var createPages = function (pageDataArr) {
 };
 
 var main = function (listData) {
-  var circles = [];
-  if (listMode === 'json') {
-    // circles = JSON.parse(readData);
-  } else {
-    circles = parseCSV(listData);
-  }
+  // if (listMode === 'json') {
+  //   main(JSON.parse(readData));
+  // }
+  var circles = parseCSV(listData);
 
   // サークル数をアラート表示
   var circlesCount = circles.length;
@@ -512,12 +509,20 @@ if (isNode) {
   if (listFile === null) {
     log('リストファイルが選択されていません');
   }
-  // サークルカット格納パスはリストと同じ場所
   cutFilePath = listFile.toString().match(/^.*\//);
+  // サークルカット格納パス
+  // function cutCallback (F) {
+  //   var re = /\.(psd|jpg|png)$/i;
+  //   return (F instanceof Folder || re.test(F.fsName));
+  // }
+  // var cutFile = File.openDialog('カットフォルダを選択', cutCallback, false);
+  // if (cutFile === null) {
+  //   log('カットフォルダが選択されていません');
+  // }
 
-  var listData = readFile(listFile);
-  if (listData) {
-    main(listData);
+  var readData = readFile(listFile);
+  if (readData) {
+    main(readData);
     // app.doScript(main, ScriptLanguage.javascript, readData, UndoModes.fastEntireScript);
   }
 }
